@@ -6,7 +6,7 @@ You can use this script if you have a library in any language which does not sup
 ## Usage
 
 * clone this repo
-* copy config.json.example to config.json
+* copy ldap-config.json.example to ldap-config.json
 * edit parameters in config.json
 * run the script
 
