@@ -1,0 +1,9 @@
+{
+  "uri": "ldap://ldap.my-ldap-company.de",
+  "port": 389,
+  "use_starttls": true,
+  "bind_dn_dir": "ou=people,dc=my-ldap-company,dc=de",
+  "username_attr_type": "uid",
+  "cert_file": "/etc/tls-ca-bundle.pem",
+  "verify_cert": true
+}
