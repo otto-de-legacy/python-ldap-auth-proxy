@@ -1,5 +1,7 @@
 from flask import Flask, request, Response
 import ldap
+import argparse
+import logging
 import json
 import sys
 
@@ -65,7 +67,7 @@ if __name__ == '__main__':
                         help='The port on which this proxy should run.')
     parser.add_argument('-v', '--verbose', nargs='?', const=logging.INFO, default=logging.ERROR,
                         help='Lets you set the loglevel. Application default: ERROR. Option default: INFO')
-    parser.add_argument('-e', '--external',
+    parser.add_argument('-e', '--external', action='store_true',
                         help='Make the auth-proxy available externally')
     args = parser.parse_args()
 
