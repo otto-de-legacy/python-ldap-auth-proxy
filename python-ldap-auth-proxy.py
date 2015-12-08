@@ -36,13 +36,16 @@ def ldap_connect(bind_user, bind_pw=""):
     if config["use_starttls"]:
         try:
             ldap_connection.start_tls_s()
-        except ldap.CONNECT_ERROR:
+        except ldap.CONNECT_ERROR as error:
+            logging.error("LDAP connection error: "+ str(error))
             return Response("{\"error\" : \"Connect error\"}", status=500)
     try:
         ldap_connection.simple_bind_s(*credentials)
-    except ldap.INVALID_CREDENTIALS:
+    except ldap.INVALID_CREDENTIALS as error:
+        logging.error("LDAP credentials error: "+ str(error))
         return Response("{\"error\" : \"Invalid credentials\"}", status=401)
-    except ldap.UNWILLING_TO_PERFORM:
+    except ldap.UNWILLING_TO_PERFORM as error:
+        logging.error("LDAP unwilling to perform: "+ str(error))
         return Response("{\"error\" : \"The server is unwilling to perform this request\"}", status=400)
     return Response(None, status=200)
 
@@ -51,15 +54,19 @@ def ldap_connect(bind_user, bind_pw=""):
 def auth():
     jsondata = request.get_json()
     if "bind_user" not in jsondata:
+        logging.error("bind_user is missing in request")
         return Response("{\"error\" : \"Key 'bind_user' is required\"}", status=400)
 
     if not jsondata["bind_user"]:
+        logging.error("bind_user is empty in request")
         return Response("{\"error\" : \"Key 'bind_user' must not be empty\"}", status=400)
 
     if "bind_pw" in jsondata and jsondata["bind_pw"]:
-        return ldap_connect(jsondata["bind_user"], jsondata["bind_pw"])
+        response = ldap_connect(jsondata["bind_user"], jsondata["bind_pw"])
     else:
-        return ldap_connect(jsondata["bind_user"])
+        response = ldap_connect(jsondata["bind_user"])
+    logging.info("Got from ldap server: " + str(response))
+    return response
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This ldap-proxy provides start_tls connection to a ldap server.')
