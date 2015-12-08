@@ -1,5 +1,7 @@
 from flask import Flask, request, Response
 import ldap
+import argparse
+import logging
 import json
 import sys
 
@@ -60,4 +62,21 @@ def auth():
         return ldap_connect(jsondata["bind_user"])
 
 if __name__ == '__main__':
-    app.run(debug=True, port=int(sys.argv[1]))
+    parser = argparse.ArgumentParser(description='This ldap-proxy provides start_tls connection to a ldap server.')
+    parser.add_argument('port',
+                        help='The port on which this proxy should run.')
+    parser.add_argument('-v', '--verbose', nargs='?', const=logging.INFO, default=logging.ERROR,
+                        help='Lets you set the loglevel. Application default: ERROR. Option default: INFO')
+    parser.add_argument('-e', '--external', action='store_true',
+                        help='Make the auth-proxy available externally')
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.verbose,
+                        datefmt='%d-%m %H:%M:%S',
+                        format='%(asctime)s %(name)-s %(levelname)-s %(message)s')
+    logging.info("auth-proxy starts with " + str(args.port))
+
+    if args.external:
+        app.run(debug=True, port=int(args.port), host='0.0.0.0')
+    else:
+        app.run(debug=True, port=int(args.port))
