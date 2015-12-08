@@ -60,4 +60,4 @@ def auth():
         return ldap_connect(jsondata["bind_user"])
 
 if __name__ == '__main__':
-    app.run(debug=True, port=int(sys.argv[1]))
+    app.run(debug=True, port=int(args.port), host='0.0.0.0')
