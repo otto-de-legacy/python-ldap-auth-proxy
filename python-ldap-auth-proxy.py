@@ -33,21 +33,26 @@ def ldap_connect(bind_user, bind_pw=""):
 
     # Create new TLS Context. Must be the last option
     ldap_connection.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
-    if config["use_starttls"]:
-        try:
-            ldap_connection.start_tls_s()
-        except ldap.CONNECT_ERROR as error:
-            logging.error("LDAP connection error: "+ str(error))
-            return Response("{\"error\" : \"Connect error\"}", status=500)
+    
+    response = Response(None, status=200);
+    
     try:
+        if config["use_starttls"]:
+            ldap_connection.start_tls_s()
         ldap_connection.simple_bind_s(*credentials)
+    except ldap.CONNECT_ERROR as error:
+        logging.error("LDAP connection error: "+ str(error))
+        response = Response("{\"error\" : \"Connect error\"}", status=500)
     except ldap.INVALID_CREDENTIALS as error:
         logging.error("LDAP credentials error: "+ str(error))
-        return Response("{\"error\" : \"Invalid credentials\"}", status=401)
+        response = Response("{\"error\" : \"Invalid credentials\"}", status=401)
     except ldap.UNWILLING_TO_PERFORM as error:
         logging.error("LDAP unwilling to perform: "+ str(error))
-        return Response("{\"error\" : \"The server is unwilling to perform this request\"}", status=400)
-    return Response(None, status=200)
+        response = Response("{\"error\" : \"The server is unwilling to perform this request\"}", status=400)
+    finally:
+        ldap_connection.unbind()
+        
+    return response
 
 
 @app.route('/', methods=['POST'])
