@@ -1,58 +1,32 @@
 from flask import Flask, request, Response
-import ldap
+import ssl
+import ldap3
 import argparse
 import logging
 import json
-import sys
 
 app = Flask(__name__)
 
-with open('ldap-config.json', 'r') as f:
-    config = json.load(f)
 
-# Inspired by flask-multipass-master/util.py
-def ldap_connect(bind_user, bind_pw=""):
-    credentials = (config["username_attr_type"] + "=" + bind_user + "," + config["bind_dn_dir"], bind_pw)
-    print("cred: " + str(credentials))
-    ldap_connection = ldap.initialize(config["uri"], config["port"])
-    ldap_connection.protocol_version = ldap.VERSION3
+def establish_connection(bind_user, password):
+    connection = ldap3.Connection(server, user=bind_user, password=password)
+    connection.open()
+    connection.start_tls()
+    return connection
 
-    if "cert_file" in config and config["cert_file"]:
-        ldap_connection.set_option(ldap.OPT_X_TLS_CACERTFILE, config['cert_file'])
 
-    # Don't resolve referrals
-    ldap_connection.set_option(ldap.OPT_REFERRALS, 0)
-
-    ldap_connection.set_option(ldap.OPT_X_TLS, ldap.OPT_X_TLS_NEVER)
-
-    # Force cert validation: ldap.OPT_X_TLS_DEMAND
-    if "verfiy_cert" in config and config["verify_cert"]:
-        ldap_connection.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
-    else:
-        ldap_connection.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_ALLOW)
-
-    # Create new TLS Context. Must be the last option
-    ldap_connection.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
-    
-    response = Response(None, status=200);
-    
-    try:
-        if config["use_starttls"]:
-            ldap_connection.start_tls_s()
-        ldap_connection.simple_bind_s(*credentials)
-    except ldap.CONNECT_ERROR as error:
-        logging.error("LDAP connection error: "+ str(error))
-        response = Response("{\"error\" : \"Connect error\"}", status=500)
-    except ldap.INVALID_CREDENTIALS as error:
-        logging.error("LDAP credentials error: "+ str(error))
-        response = Response("{\"error\" : \"Invalid credentials\"}", status=401)
-    except ldap.UNWILLING_TO_PERFORM as error:
-        logging.error("LDAP unwilling to perform: "+ str(error))
-        response = Response("{\"error\" : \"The server is unwilling to perform this request\"}", status=400)
-    finally:
-        ldap_connection.unbind()
-        
-    return response
+def ldap_connect(username, password=""):
+    logging.info("Got request with " + str(username))
+    bind_user = config["username_attr_type"] + "=" + username + "," + config["bind_dn_dir"]
+    with establish_connection(bind_user, password) as ldap_connection:
+        try:
+            if ldap_connection.bind():
+                return Response("{\"status\" : \"ok\"}", status=200)
+            else:
+                return Response("{\"status\" : \"" + ldap_connection.last_error + "\"}", status=401)
+        except Exception as err:
+            logging.ERROR(str(err))
+            return Response("{\"status\" : \"" + ldap_connection.last_error + "\"}", status=500)
 
 
 @app.route('/', methods=['POST'])
@@ -70,8 +44,9 @@ def auth():
         response = ldap_connect(jsondata["bind_user"], jsondata["bind_pw"])
     else:
         response = ldap_connect(jsondata["bind_user"])
-    logging.info("Got from ldap server: " + str(response))
+    logging.info("Returning response: " + str(response))
     return response
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='This ldap-proxy provides start_tls connection to a ldap server.')
@@ -87,6 +62,12 @@ if __name__ == '__main__':
                         datefmt='%d-%m %H:%M:%S',
                         format='%(asctime)s %(name)-s %(levelname)-s %(message)s')
     logging.info("auth-proxy starts with " + str(args.port))
+
+    with open('ldap-config.json', 'r') as f:
+        config = json.load(f)
+
+    tls = ldap3.Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLSv1, ca_certs_file=config['cert_file'])
+    server = ldap3.Server(host=config["uri"], port=config['port'], tls=tls)
 
     if args.external:
         app.run(debug=True, port=int(args.port), host='0.0.0.0')
